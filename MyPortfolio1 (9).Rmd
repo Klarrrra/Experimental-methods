@@ -1,0 +1,202 @@
+---
+title: "Portfolio 1"
+author: "Klara"
+date: "9/22/2020"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE, include = TRUE)
+library(tidyverse)
+```
+
+
+## Portfolio Part 1
+
+
+### Write a short data mining report on the CogSci Intro Week Personality Test Data in which you answer the following questions in prose, code and graphs:
+
+First of all, you have to import the personality data. If the dataset is in your working directory, then you can just load it into R. Otherwise you will have to change your working directory.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+df <- read.csv("NEW_CogSciPersonalityTest2019.csv")
+view(df)
+```
+Once you are done loading the data, you can start working on the questions below.
+
+
+### Question 1
+Who can hold their breath longer on average, those with right or left ocular dominance? Plot the data using ggplot2 to find out. The plots should include error bars (depicting the standard error of the means). Then use the mean() and sd() functions to find mean and standard deviation of the two eye dominance groups.
+
+
+```{r}
+breath_by_ocular <- df %>%
+  group_by(ocular_dom) %>%
+  summarise(mean(breath_hold))
+breath_by_ocular
+
+breath_by_ocularsd <- df %>%
+  group_by(ocular_dom) %>%
+  summarise(sd(breath_hold))
+breath_by_ocularsd
+
+
+ggplot(df, aes(x=ocular_dom, y=breath_hold))+
+  geom_bar(aes(fill= ocular_dom), stat = 'summary', fun.y = mean, width = 0.25)+
+  stat_summary(fun.data = mean_se, geom = "errorbar", color = 'red', width = 0.1) +
+  labs(x = "ocular_dom", y = "breath_hold") +
+  ggtitle("breath hold by ocular dominans")
+
+
+
+```
+
+The mean: the ones that have right dominans hold their breath longer, but its not a very big difference. (and also our sample size is very small)
+
+We can also see the same in the plot - here we can see the different error bars as well, which also suggests that we cant conclude anything sure from the difference in mean
+
+
+
+### Question 2
+Who likes silence vs. noise best? Males or females? Also in this case you should plot the data using ggplot2 (including error bars), then use the mean() and sd() functions to find mean and standard deviation of the two genders.
+
+
+```{r}
+
+
+soundlevel_by_gender <- df %>%
+  group_by(gender) %>%
+  summarise(mean(sound_level_pref))
+soundlevel_by_gender
+
+
+soundlevel_by_gendersd <- df %>%
+  group_by(gender) %>%
+  summarise(sd(sound_level_pref))
+soundlevel_by_gendersd
+
+
+
+ggplot(df, aes(x=gender, y=sound_level_pref))+
+  geom_bar(aes(fill= gender),stat="summary", fun.y = mean, width = 0.25)+
+  stat_summary(fun.data= mean_se, geom = "errorbar", color = "red", width =0.1)+
+  labs(x = "gender", y = "sound_level_pref") +
+  ggtitle("soundlevel by gender")
+
+```
+
+From the mean, we can see they are almost the same (for men a tiny bit more)
+From the plot: We can see the error bar is bigger for men (=more varied answer)
+
+### Question 3
+Are the breath_hold data normally distributed? Provide visual and numeric support for your answer.
+
+```{r}
+#test for normality
+round(pastecs::stat.desc(df$breath_hold, basic = FALSE, norm = TRUE), digits = 2)
+shapiro.test(df$breath_hold)
+
+
+qqnorm(df$breath_hold)
+
+ggplot(df, aes(x = breath_hold)) +
+  geom_histogram(colour="#986C6A", fill="#590925") +
+  ggtitle("histogram") +
+  labs(x="breath hold")
+
+```
+
+Breath hold is is not normally distributed (shapiro Wilks p value < 0,05) - we can also see that it doesnt look normally distributed in the QQ-plot (it doesnt form a straight diagonal line) and the histogram is positively skewec. 
+
+
+### Question 4
+Are the Balloon reaction time data (balloon and balloon_balance) normally distributed? Provide visual and numeric support for your answer.
+
+
+Balloon:
+```{r}
+round(pastecs::stat.desc(df$balloon, basic = FALSE, norm = TRUE), digits = 2)
+shapiro.test(df$balloon)
+
+qqnorm(df$balloon)
+
+
+filtered <- df %>% filter(balloon<120)
+ggplot(filtered, aes(x = filtered$balloon)) +
+  geom_histogram(colour="#986C6A", fill="#590925") +
+  ggtitle("histogram") +
+  labs(x="balloon balance", y="Count")
+
+
+```
+
+The normality-test shows that balloon data is not normally distributes (Shapiro-Wilk < 0,05). 
+With a QQ-plot we can also see that it is not normally distributed at all. 
+We see a cealling-floor effect --> suggestion is therefor to re-do the experiment, so we can find an actual effect. 
+If you remove the worst outliers and do a histogram we can also see that its very positively skewed
+
+
+Balloon balance:
+```{r}
+round(pastecs::stat.desc(df$balloon_balance, basic = FALSE, norm = TRUE), digits = 2)
+shapiro.test(df$balloon_balance)
+
+qqnorm(df$balloon_balance)
+
+
+filtered <- df %>% filter(balloon_balance<120)
+ggplot(filtered, aes(x = filtered$balloon_balance)) +
+  geom_histogram(colour="#986C6A", fill="#590925") +
+  ggtitle("histogram") +
+  labs(x="balloon balance", y="Count")
+  
+```
+
+Balloon balance is also not normally distributed. In the QQ-plot we also here see floor-cealing effect (should re do experiment with new premises). If we remove outliers it is stille clearly positive skewed
+
+### Question 5
+Shoe size could tell us something about general body size, which could also be connected to one’s ability to hold your breath. In other words we predict that there is a positive relation between shoe size and how long time CogSci students can hold their breath. Try plotting the two sets of data against each other using a scatter plot (hint: both variables are continuous variables). Bonus question: Males and females have different body sizes. Use grouping in your plot to distinguish the relationship between shoe size and holding breath for males and females.
+
+### scatterplot
+```{r}
+
+ggplot(df, aes(x = shoesize, y = breath_hold)) +
+  geom_point() 
+
+
+df %>% group_by(gender) %>%
+  ggplot(aes(x=shoesize, y=breath_hold,colour=gender))+
+    geom_point()
+    
+```
+
+In the scatterplot it looks like there is a weak positive relation - the ones with bigger feets (=bigger bodies probably) are better at holding breath. 
+
+Grouping this by gender makes it possible to see that gender is a mediating variable. (women genereally are worse at holding breath and have also smaller feets (=smaller bodies))
+
+
+
+## Part 2????
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
