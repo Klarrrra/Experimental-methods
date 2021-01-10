@@ -1,0 +1,223 @@
+---
+title: "Portfolio 3"
+author: "Klara"
+date: "10/11/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+##Portfolio 3: The Reading Experiment
+In this portfolio assignment, you will be conducting analyses of data from your reading experiment. Instead of being provided with a pre-made .Rmd file as in the previous portfolios, you will have to build one up from scratch.
+
+The portfolio has two overall sections asking different questions:
+
+1) a correlational section investigating which aspects of words correlate with reading times;
+
+2) an experimental section in which you will investigate how semantic-contextual expectations predict reading times for specific, semantically unexpected words.
+
+
+For each of the two analyses, remember to make qualified choices of statistical test based on assumption testing (you are welcome to report on how you tested the assumptions as well as how you transformed the data to match those assumptions, if relevant). Furthermore, please provide a written report for each analysis with your (empirically corroborated) interpretation of the results, together with at least one plot illustrating the results (feel free to use more than plots as well as to use tables).
+
+
+```{r}
+library(tidyverse)
+library(pastecs)
+library(stringr)
+```
+
+```{r}
+
+RT <- read_csv2("/Users/marko/Desktop/Klara R/RT.csv")
+view(RT)
+
+```
+
+#Editing data frames
+```{r}
+#Adding wordlength column
+RT$Word <- as.character(RT$Word)
+RT$WordLength <- nchar(RT$Word)
+view(RT)
+
+#adding wordfrequency column
+#this will be added from another file 
+#I dont understand this MRC.db dataframe that I am adding
+RT$Word <- str_replace_all(RT$Word, "[:punct:]", "")
+
+MRC.db <- read_csv2("/Users/marko/Desktop/Klara R/MRC_database (2).csv")
+view(MRC.db)
+
+MRC.db$word <- as.character(MRC.db$word)
+class(MRC.db$word)
+
+#Changing to uppercase letters (toupper) and adding columns w row number
+
+Data <- RT %>% mutate(word = toupper(Word), RowNum=row_number(), WordLength = nchar(Word))
+
+#adding column with wordnumber 
+Data <- Data %>% group_by(ID) %>% mutate(WordNumber=row_number())
+Data$Word <- toupper(Data$Word)
+
+view(Data)
+
+#Merging columns word/Word
+data <- merge(x=Data, y= MRC.db, by.x= "Word", by.y = "word")%>%
+  select(RowNum, ID, Word, Age, Gender, Condition, ReadingTime, kf_freq, WordNumber, WordLength)  %>%
+  distinct() %>%
+  arrange(RowNum)
+
+view(data)
+
+#Giving the conditions the same name - i dont understand this:
+data$Condition <- ifelse(data$Condition=="Condition 1", "1", data$Condition)
+data$Condition <- ifelse(data$Condition=="Condition 2", "2", data$Condition)
+data$Condition <- ifelse(data$Condition=="4", "2", data$Condition)
+data$Condition <- ifelse(data$Condition=="3", "2", data$Condition)
+
+view(data)
+
+```
+
+
+##PART 1: Which properties of words correlate with word-by-word reading times?
+
+Please conduct three iterations of correlation analysis, each addressing one of the following three word properties: word length, word frequency, and word number.
+
+###1: Check Normality
+First we need to check normality of our data
+
+```{r}
+
+#Normality check of reading time - why does it only give NA?
+data$ReadingTime <- as.numeric(data$ReadingTime)
+class(data$ReadingTime)
+
+round(pastecs::stat.desc(data$ReadingTime, basic = FALSE, norm = TRUE), digits = 2)
+shapiro.test(data$ReadingTime)
+qplot(sample = data$ReadingTime, stat = "qq")+
+  stat_qq_line()
+
+#its not normally distributed at all
+#we can also see there are a lot of outliers 
+
+#Removing outliers
+filtered <- data %>% filter(ReadingTime<1.5)
+
+ggplot(filtered, aes(x=ReadingTime)) +
+  geom_histogram(aes(y=..density..))+
+  stat_function(fun=dnorm, args=list(mean=mean(filtered$ReadingTime, na.rm=TRUE), sd=sd(filtered$ReadingTime, na.rm=TRUE)), colour="red", size=1)+
+  ggtitle("Reading Time")+
+  labs(x="Reading Time")
+
+
+
+qplot(sample = filtered$ReadingTime, stat = "qq")+
+  stat_qq_line()
+
+#as we can see its still positively skewed and not normally distributed
+
+```
+
+Comments:
+Reading time is not normality - and there is a lot of outliers --> I have removed outliers - but still then it is not normally distributed 
+Q: do you also have to check normality of:  word length, word frequency, and word number?
+
+###2:Tranforming non-normality data
+```{r}
+#Becouse its not nomrally distributed - and possitively skewed we can use 3 kinds of transformations: log(), square root, reciprocal
+
+#log
+log_trans <- filtered %>% mutate(ReadingTime_log = log(ReadingTime)) #log transformation
+#histogram
+ggplot(log_trans, aes(x = ReadingTime_log)) +
+  geom_histogram(aes(y = ..density..), binwidth = 0.25, color= 'black', fill = 'white') +
+  ggtitle("Log trasnformed") +
+  stat_function(fun = dnorm, args = list(mean = mean(log_trans$ReadingTime_log, na.rm = TRUE), sd = sd(log_trans$ReadingTime_log, na.rm = TRUE)), colour= "darkgreen", size = 1)+
+  theme_classic()
+
+
+#square root
+sqrt_trans <- filtered %>% mutate(ReadingTime_sqrt = sqrt(ReadingTime)) #sqrt transformation
+#histogram
+ggplot(sqrt_trans, aes(x = ReadingTime_sqrt)) +
+  geom_histogram(aes(y = ..density..), binwidth = 0.25, color= 'black', fill = 'white') +
+  ggtitle("sqrt trasnformed") +
+  stat_function(fun = dnorm, args = list(mean = mean(sqrt_trans$ReadingTime_sqrt, na.rm = TRUE), sd = sd(sqrt_trans$ReadingTime_sqrt, na.rm = TRUE)), colour= "darkgreen", size = 1)+
+  theme_classic()
+
+#reciprocal transformation
+reci_trans <- filtered %>% mutate(ReadingTime_reci = 1/(ReadingTime)) #reci transformation
+
+ggplot(reci_trans, aes(x = ReadingTime_reci)) +
+  geom_histogram(aes(y = ..density..), binwidth = 0.25, color= 'black', fill = 'white') +
+  ggtitle("reci trasnformed") +
+  stat_function(fun = dnorm, args = list(mean = mean(reci_trans$ReadingTime_reci, na.rm = TRUE), sd = sd(reci_trans$ReadingTime_reci, na.rm = TRUE)), colour= "darkgreen", size = 1)+
+  theme_classic()
+
+```
+Comments:
+I have transformed the Reading time data, as it wasnt normally distributed  
+
+
+
+###3: Check correalation
+We use Kendall as we can not assure normality
+
+```{r}
+#wordlength
+cor.test(data$ReadingTime, data$WordLength, method= "kendall")
+#tau = 0,03 --> significant (p<0,05) 
+
+#wordnumber
+cor.test(data$ReadingTime, data$WordNumber, method= "kendall")
+#tau = -0,1 --> significant (p<0,05)
+
+#kf_freq
+cor.test(data$ReadingTime, data$kf_freq, method="kendall")
+#tau = -0.02509992  --> not significant (p>0,05)
+
+```
+
+
+```{r}
+
+#if you fx sorted out outliers frim readingtime
+
+ReadingTime_filter <- data %>% filter(ReadingTime<1.5) #tidyverse
+cor.test(ReadingTime_filter$ReadingTime, ReadingTime_filter$WordLength, method= "kendall")
+```
+
+Comments:
+There is no correalation between reading time and word leingth - but its significant.
+There is a weak negative correalation between reading time and wordnumber 
+There is not a correalation - and its also not significant between reading time and kf_frequency
+
+There is though a lot of outliers which causes these correalations. 
+
+
+Questions:
+Q: why can we not just use the transformed data?
+Q: is there a reason to use kendall instead of spearman?
+Q: how can you see that there is not a correalation between reading time and word length? --> it looks like there is? (it should be a strong corelation)
+QI get a significant weak correalaition between word length and reading time --> why doesnt alba?
+
+
+
+##PART 2: How do semantic-contextual expectations affect reading times?
+Please conduct a contrastive analysis of the two conditions in your reading experiment (where condition #2 corresponds to the text with the semantically surprising word). Single out the specific reading time for the target word (i.e., the words that differ between the two versions of your text/story) as well as the following word. Compare the means of the reading times for those words (independently) across conditions using the appropriate type of t-test.
+
+```{r}
+I dont understand :( 
+```
+
+
+
+
+
+
+
+
