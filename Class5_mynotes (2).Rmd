@@ -1,0 +1,217 @@
+---
+title: "Class5_notes"
+author: "Klara"
+date: "10/9/2019"
+output: html_document
+---
+
+## Welcome to Class 5!
+
+Today we will go beyond descriptive statistics in R and look at *correlations*!
+
+We will need libraries tidyverse and pastecs
+We will also need the small_subset.csv as an example, I recommend calling it 'df' to be consistent with my code. It's just a subset from the personality test data.
+
+```{r load/install packages/load data}
+
+pacman::p_load(tidyverse,pastecs)
+
+#import data
+df <- read.table("small_subset.csv", header= TRUE, sep=",")
+df
+
+```
+
+
+### Part 1: Calculating Covariance and Correlation
+#### Understanding Covariance equation
+For the equation, we need: deviation of each score from the mean of each of the varibales degrees of freedom
+
+```{r}
+#there is a long way of doing this that I havent done, but its the same as:
+covariance <- cov(df$shoesize, df$breath_hold) 
+covariance
+#an easier meassure of the same is pearsons R
+```
+
+##Understanding Correlation
+For the equation, we need: value of covariance standard deviations of both variables
+
+
+
+```{r}
+#there is a long way of doing this that I havent done, but its the same as:
+
+#pearsons R
+output_pearson <- cor.test(df$shoesize, df$breath_hold, method = 'pearson')
+output_pearson
+
+r_pearson <- output_pearson$estimate #saving it as an estimate
+r_pearson
+
+#before we can be sure pearsons r is a good meassure we have to see if the data is normally distributed
+```
+
+Is it meaningful though?
+
+```{r}
+#to test that lets see if it is normally distributed:
+round(pastecs::stat.desc(cbind(df$shoesize, df$breath_hold), basic = FALSE, norm = TRUE), digits = 2) #not normally distributed at all
+
+#this data is not normally distributed
+# we can see that it is not normally destributed by: 
+#skew and kurtosis - but I dont know how to read it??
+
+```
+
+
+```{r}
+#as it is not normally distributed we use spearman instead of pearson
+spearman <- cor.test(df$shoesize, df$breath_hold, method = 'spearman')
+spearmans <- spearman$estimate
+spearmans
+
+#and kendalls tau
+kendall <- cor.test(df$shoesize, df$breath_hold, method = 'kendall')
+tau <- kendall$estimate
+tau
+#so which one is best to use?? and how do I read them??
+
+```
+
+##Part 2: working with reading experiment data
+
+We’ve got some interesting data to work with!
+
+Load your reading experiment logfile (it should be in the same folder as this Rmd file, which is your working directory)
+
+```{r}
+
+rdf <- read.csv("sample_logfile.csv")
+view(rdf)
+
+```
+
+We have one continuous variable in our logfile - reading time.
+
+Here is an example of how to calculate word length for all words in the dataframe:
+
+```{r}
+example <- data.frame(words = c("This", "is", "not", "a", "real", "dataframe"),
+             rt = rnorm(n = 6, mean = 2, sd = 0.1))
+example
+```
+
+```{r}
+example$words <- as.character(example$words)
+
+#adding the word-length:
+example$wordlength <- nchar(example$words)
+example
+
+```
+
+Now do the same for the real experiment
+
+```{r}
+rdf$word
+rdf$word <- as.character(rdf$word)
+
+#adding the word-length:
+rdf$wordlength <- nchar(rdf$word)
+rdf
+```
+
+
+##Analysis of reading data 
+Assumptions: are your data normally distributed?
+
+```{r}
+#check normality
+round(pastecs::stat.desc(cbind(rdf$rt, rdf$wordlength), basic = FALSE, norm = TRUE), digits = 2)
+#what is rt?
+#it is not normally distributed - the skew is bigger than 1
+
+```
+
+
+```{r}
+#transformation of rt: log, sqrt and rec(what is rec?): 
+rdf <- rdf %>% 
+  mutate(rt_log = log(rt),
+         wordlength_log = log(wordlength),
+         rt_sqrt = sqrt(rt),
+         wordlength_sqrt = sqrt(wordlength),
+         rt_rec = 1/rt,
+         wordlength_rec = 1/wordlength)
+
+
+#normallity check with the new transformations:
+round(pastecs::stat.desc(cbind(rdf$rt, rdf$rt_log, rdf$rt_sqrt, rdf$rt_rec), basic = FALSE, norm = TRUE), digits = 2)
+
+#each row shows the normality check for each transformation 
+#the closest is the log trans, but its skew is still bigger than 1 (!) so its just not normal i guess??
+
+```
+
+
+
+```{r}
+#transformation of wordlength
+round(pastecs::stat.desc(cbind(rdf$wordlength, rdf$wordlength_log, rdf$wordlength_sqrt, rdf$wordlength_rec), basic = FALSE, norm = TRUE), digits = 2)
+
+#the squre root looks the best --> why does she say "but still don't fix the non-normality" --> skew and kurtosis is less than 1, so why is it not normal??
+
+```
+
+```{r}
+#pearsons r
+
+output_pearson <- cor.test(rdf$rt_log, rdf$wordlength_sqrt, method = 'pearson')
+r_pearson <- output_pearson$estimate
+r_pearson
+
+#it seems better to run Spearman
+output_spearman <- cor.test(rdf$rt, rdf$wordlength, method = 'spearman')
+output_spearman
+```
+
+
+--- 
+
+### Part 3: Scatter plot and reporting results
+
+```{r}
+
+#scatterplot: x = wordlenght, y=rt
+ggplot(rdf,aes(wordlength, rt))+
+  geom_point() +
+  geom_smooth(method="lm")+ #linear model
+  theme_minimal()+
+  xlab("Word Length")+
+  ylab("Reading Time")+
+  ggtitle("Reading time as is")
+```
+
+
+```{r}
+#is this a marginsplot?
+ggplot(rdf,aes(wordlength, rt))+
+  geom_point(stat = "summary", fun.y = mean) +
+  geom_smooth(method="lm") #linear model
+```
+
+
+```{r}
+#im not sure why we are doing this one:
+ggplot(df,aes(df$shoesize, df$shoesize))+
+  geom_point()+
+  geom_smooth(method="lm") +
+  theme_minimal()
+```
+
+
+Report the results: APA format: r(degrees of freedom) = correlation coefficient estimate, p = p-value Degrees of freedom are (N - 2) for correlations You can also report shared variance: R2
+
+Example: “Reading time (RT) was found to negatively correlate with word length, r(60) = - 0.71, p = .02, R2 = 0.50”
+
